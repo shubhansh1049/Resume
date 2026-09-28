@@ -4,268 +4,170 @@ const pdfParse = require("pdf-parse");
 const ResumeAnalysis = require("../Model/ResumeAnalysis");
 
 const analyzeResume = async (req, res) => {
-
     try {
 
-        console.log("========== RESUME ANALYSIS START ==========");
+        console.log("===== RESUME ANALYSIS STARTED =====");
 
-        // ==============================
-        // 1. CHECK FILE
-        // ==============================
-
-        console.log("File:", req.file);
-
+        // Check PDF
         if (!req.file) {
-
             return res.status(400).json({
                 success: false,
                 message: "Resume PDF is required"
             });
-
         }
 
+        console.log("File received:", req.file.originalname);
+        console.log("File path:", req.file.path);
 
-        // ==============================
-        // 2. CHECK JOB DESCRIPTION
-        // ==============================
+        // Check job description
+        const jobDescription = req.body.jobDescription;
 
-        console.log("Body:", req.body);
-
-        const jobDescription =
-            req.body.jobDescription;
-
-        if (
-            !jobDescription ||
-            jobDescription.trim() === ""
-        ) {
-
+        if (!jobDescription || !jobDescription.trim()) {
             return res.status(400).json({
                 success: false,
                 message: "Job description is required"
             });
-
         }
 
+        console.log("Job description received");
 
-        // ==============================
-        // 3. READ PDF
-        // ==============================
+        // Read PDF
+        const pdfBuffer = fs.readFileSync(req.file.path);
 
-        console.log(
-            "Reading PDF:",
-            req.file.path
-        );
+        console.log("PDF size:", pdfBuffer.length);
 
-        const pdfBuffer =
-            fs.readFileSync(req.file.path);
+        // ==========================================
+        // PDF PARSING FOR pdf-parse 2.x
+        // ==========================================
 
-        console.log(
-            "PDF size:",
-            pdfBuffer.length
-        );
+        const parser = new pdfParse.PDFParse({
+            data: pdfBuffer
+        });
 
+        const pdfData = await parser.getText();
 
-        // ==============================
-        // 4. EXTRACT PDF TEXT
-        // ==============================
+        await parser.destroy();
 
-        console.log("Parsing PDF...");
-
-        const pdfData =
-            await pdfParse(pdfBuffer);
-
-        console.log("PDF parsed successfully");
-
-        const resumeText =
-            pdfData.text || "";
+        const resumeText = pdfData.text || "";
 
         console.log(
-            "Resume text length:",
+            "Extracted resume text length:",
             resumeText.length
         );
 
-
-        if (resumeText.trim() === "") {
-
+        if (!resumeText.trim()) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Could not extract text from PDF. Please upload a text-based PDF."
+                message: "Could not extract text from PDF"
             });
-
         }
 
+        // ==========================================
+        // LOWERCASE TEXT
+        // ==========================================
 
-        // ==============================
-        // 5. LOWERCASE TEXT
-        // ==============================
+        const resumeLower = resumeText.toLowerCase();
+        const jobLower = jobDescription.toLowerCase();
 
-        const resumeLower =
-            resumeText.toLowerCase();
-
-        const jobLower =
-            jobDescription.toLowerCase();
-
-
-        // ==============================
-        // 6. SKILLS
-        // ==============================
+        // ==========================================
+        // SKILLS
+        // ==========================================
 
         const skills = [
-
             "javascript",
             "java",
             "python",
-
             "react",
             "react.js",
-
             "node.js",
             "express",
-
             "mongodb",
             "mysql",
             "sql",
-
             "html",
             "css",
-
             "git",
             "github",
-
             "docker",
             "aws",
-
             "android",
             "android studio",
             "kotlin",
-
             "spring boot",
-
             "rest api",
             "api",
-
             "playwright",
             "selenium",
-
             "testing",
             "manual testing"
-
         ];
 
-
-        // ==============================
-        // 7. FIND RESUME SKILLS
-        // ==============================
+        // ==========================================
+        // FIND RESUME SKILLS
+        // ==========================================
 
         const foundSkills = [];
 
         skills.forEach((skill) => {
 
-            if (
-                resumeLower.includes(
-                    skill.toLowerCase()
-                )
-            ) {
+            if (resumeLower.includes(skill.toLowerCase())) {
 
-                if (
-                    !foundSkills.includes(skill)
-                ) {
-
+                if (!foundSkills.includes(skill)) {
                     foundSkills.push(skill);
-
                 }
 
             }
 
         });
 
+        console.log("Resume skills:", foundSkills);
 
-        console.log(
-            "Resume Skills:",
-            foundSkills
-        );
-
-
-        // ==============================
-        // 8. FIND JOB SKILLS
-        // ==============================
+        // ==========================================
+        // FIND JOB SKILLS
+        // ==========================================
 
         const jobSkills = [];
 
         skills.forEach((skill) => {
 
-            if (
-                jobLower.includes(
-                    skill.toLowerCase()
-                )
-            ) {
+            if (jobLower.includes(skill.toLowerCase())) {
 
-                if (
-                    !jobSkills.includes(skill)
-                ) {
-
+                if (!jobSkills.includes(skill)) {
                     jobSkills.push(skill);
-
                 }
 
             }
 
         });
 
+        console.log("Job skills:", jobSkills);
 
-        console.log(
-            "Job Skills:",
-            jobSkills
+        // ==========================================
+        // MATCHING SKILLS
+        // ==========================================
+
+        const matchingSkills = jobSkills.filter(
+            (skill) => foundSkills.includes(skill)
         );
 
+        // ==========================================
+        // MISSING SKILLS
+        // ==========================================
 
-        // ==============================
-        // 9. MATCHING SKILLS
-        // ==============================
-
-        const matchingSkills =
-            jobSkills.filter(
-                (skill) =>
-                    foundSkills.includes(skill)
-            );
-
-
-        // ==============================
-        // 10. MISSING SKILLS
-        // ==============================
-
-        const missingSkills =
-            jobSkills.filter(
-                (skill) =>
-                    !foundSkills.includes(skill)
-            );
-
-
-        console.log(
-            "Matching Skills:",
-            matchingSkills
+        const missingSkills = jobSkills.filter(
+            (skill) => !foundSkills.includes(skill)
         );
 
-        console.log(
-            "Missing Skills:",
-            missingSkills
-        );
-
-
-        // ==============================
-        // 11. CALCULATE SCORE
-        // ==============================
+        // ==========================================
+        // SCORE
+        // ==========================================
 
         let score = 0;
 
         if (jobSkills.length > 0) {
 
             score = Math.round(
-                (
-                    matchingSkills.length /
-                    jobSkills.length
-                ) * 100
+                (matchingSkills.length / jobSkills.length) * 100
             );
 
         } else {
@@ -274,23 +176,17 @@ const analyzeResume = async (req, res) => {
 
         }
 
+        console.log("Matching skills:", matchingSkills);
+        console.log("Missing skills:", missingSkills);
+        console.log("Score:", score);
 
-        console.log(
-            "Score:",
-            score
-        );
-
-
-        // ==============================
-        // 12. SUGGESTIONS
-        // ==============================
+        // ==========================================
+        // SUGGESTIONS
+        // ==========================================
 
         const suggestions = [];
 
-
-        if (
-            missingSkills.length > 0
-        ) {
+        if (missingSkills.length > 0) {
 
             suggestions.push(
                 "Add relevant skills from the job description if you genuinely have those skills."
@@ -298,10 +194,7 @@ const analyzeResume = async (req, res) => {
 
         }
 
-
-        if (
-            resumeText.length < 1000
-        ) {
+        if (resumeText.length < 1000) {
 
             suggestions.push(
                 "Consider adding more relevant projects, experience and achievements."
@@ -309,12 +202,7 @@ const analyzeResume = async (req, res) => {
 
         }
 
-
-        if (
-            !resumeLower.includes(
-                "experience"
-            )
-        ) {
+        if (!resumeLower.includes("experience")) {
 
             suggestions.push(
                 "Consider adding an Experience section if you have relevant experience."
@@ -322,12 +210,7 @@ const analyzeResume = async (req, res) => {
 
         }
 
-
-        if (
-            !resumeLower.includes(
-                "project"
-            )
-        ) {
+        if (!resumeLower.includes("project")) {
 
             suggestions.push(
                 "Consider adding relevant projects."
@@ -335,12 +218,7 @@ const analyzeResume = async (req, res) => {
 
         }
 
-
-        if (
-            !resumeLower.includes(
-                "education"
-            )
-        ) {
+        if (!resumeLower.includes("education")) {
 
             suggestions.push(
                 "Consider adding an Education section."
@@ -348,10 +226,7 @@ const analyzeResume = async (req, res) => {
 
         }
 
-
-        if (
-            suggestions.length === 0
-        ) {
+        if (suggestions.length === 0) {
 
             suggestions.push(
                 "Your resume contains the main keywords detected from the job description."
@@ -359,164 +234,110 @@ const analyzeResume = async (req, res) => {
 
         }
 
+        // ==========================================
+        // SAVE TO MONGODB
+        // ==========================================
 
-        // ==============================
-        // 13. SAVE TO MONGODB
-        // ==============================
+        const analysis = await ResumeAnalysis.create({
 
-        console.log(
-            "Saving result to MongoDB..."
-        );
+            resumeName: req.file.originalname,
 
-        const analysis =
-            await ResumeAnalysis.create({
+            jobDescription: jobDescription,
 
-                resumeName:
-                    req.file.originalname,
+            score: score,
 
-                jobDescription:
-                    jobDescription,
+            matchingSkills: matchingSkills,
 
-                score:
-                    score,
+            missingSkills: missingSkills,
 
-                matchingSkills:
-                    matchingSkills,
+            resumeSkills: foundSkills,
 
-                missingSkills:
-                    missingSkills,
+            jobSkills: jobSkills,
 
-                resumeSkills:
-                    foundSkills,
+            suggestions: suggestions,
 
-                jobSkills:
-                    jobSkills,
+            resumeText: resumeText
 
-                suggestions:
-                    suggestions,
-
-                resumeText:
-                    resumeText
-
-            });
-
+        });
 
         console.log(
-            "Saved successfully:",
+            "Analysis saved:",
             analysis._id
         );
 
+        // ==========================================
+        // DELETE TEMP PDF
+        // ==========================================
 
-        // ==============================
-        // 14. DELETE PDF
-        // ==============================
+        fs.unlink(req.file.path, (error) => {
 
-        fs.unlink(
-            req.file.path,
-            (error) => {
+            if (error) {
 
-                if (error) {
+                console.log(
+                    "File deletion error:",
+                    error.message
+                );
 
-                    console.log(
-                        "File deletion error:",
-                        error.message
-                    );
+            } else {
 
-                } else {
-
-                    console.log(
-                        "PDF deleted"
-                    );
-
-                }
+                console.log("Temporary PDF deleted");
 
             }
-        );
 
+        });
 
-        // ==============================
-        // 15. RESPONSE
-        // ==============================
+        // ==========================================
+        // RESPONSE
+        // ==========================================
 
         return res.status(200).json({
 
             success: true,
 
-            message:
-                "Resume analyzed and saved successfully",
+            message: "Resume analyzed and saved successfully",
 
             result: {
 
-                id:
-                    analysis._id,
+                id: analysis._id,
 
-                resumeName:
-                    analysis.resumeName,
+                resumeName: analysis.resumeName,
 
-                score:
-                    analysis.score,
+                score: analysis.score,
 
-                matchingSkills:
-                    analysis.matchingSkills,
+                matchingSkills: analysis.matchingSkills,
 
-                missingSkills:
-                    analysis.missingSkills,
+                missingSkills: analysis.missingSkills,
 
-                resumeSkills:
-                    analysis.resumeSkills,
+                resumeSkills: analysis.resumeSkills,
 
-                jobSkills:
-                    analysis.jobSkills,
+                jobSkills: analysis.jobSkills,
 
-                suggestions:
-                    analysis.suggestions
+                suggestions: analysis.suggestions
 
             }
 
         });
 
-
     } catch (error) {
 
-        // ==============================
-        // ERROR
-        // ==============================
-
-        console.log(
-            "========== RESUME ANALYSIS ERROR =========="
-        );
-
-        console.log(
-            "Error message:",
-            error.message
-        );
-
-        console.log(
-            "Full error:",
-            error
-        );
-
-        console.log(
-            "==========================================="
-        );
-
+        console.log("=================================");
+        console.log("RESUME ANALYSIS ERROR");
+        console.log("Error message:", error.message);
+        console.log("Full error:", error);
+        console.log("=================================");
 
         return res.status(500).json({
 
             success: false,
 
-            message:
-                "Error analyzing resume",
+            message: "Error analyzing resume",
 
-            error:
-                error.message
+            error: error.message
 
         });
 
     }
-
 };
-
 
 module.exports = {
     analyzeResume
