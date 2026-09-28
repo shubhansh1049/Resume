@@ -3,24 +3,41 @@ const pdfParse = require("pdf-parse");
 
 const ResumeAnalysis = require("../Model/ResumeAnalysis");
 
-
 const analyzeResume = async (req, res) => {
 
     try {
 
-        // Check resume
+        console.log("========== RESUME ANALYSIS START ==========");
+
+        // ==============================
+        // 1. CHECK FILE
+        // ==============================
+
+        console.log("File:", req.file);
+
         if (!req.file) {
+
             return res.status(400).json({
                 success: false,
                 message: "Resume PDF is required"
             });
+
         }
 
 
-        // Check job description
-        const jobDescription = req.body.jobDescription;
+        // ==============================
+        // 2. CHECK JOB DESCRIPTION
+        // ==============================
 
-        if (!jobDescription) {
+        console.log("Body:", req.body);
+
+        const jobDescription =
+            req.body.jobDescription;
+
+        if (
+            !jobDescription ||
+            jobDescription.trim() === ""
+        ) {
 
             return res.status(400).json({
                 success: false,
@@ -30,23 +47,70 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        // Read PDF
-        const pdfBuffer = fs.readFileSync(req.file.path);
+        // ==============================
+        // 3. READ PDF
+        // ==============================
+
+        console.log(
+            "Reading PDF:",
+            req.file.path
+        );
+
+        const pdfBuffer =
+            fs.readFileSync(req.file.path);
+
+        console.log(
+            "PDF size:",
+            pdfBuffer.length
+        );
 
 
-        // Extract PDF text
-        const pdfData = await pdfParse(pdfBuffer);
+        // ==============================
+        // 4. EXTRACT PDF TEXT
+        // ==============================
 
-        const resumeText = pdfData.text;
+        console.log("Parsing PDF...");
+
+        const pdfData =
+            await pdfParse(pdfBuffer);
+
+        console.log("PDF parsed successfully");
+
+        const resumeText =
+            pdfData.text || "";
+
+        console.log(
+            "Resume text length:",
+            resumeText.length
+        );
 
 
-        // Convert to lowercase
-        const resumeLower = resumeText.toLowerCase();
+        if (resumeText.trim() === "") {
 
-        const jobLower = jobDescription.toLowerCase();
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Could not extract text from PDF. Please upload a text-based PDF."
+            });
+
+        }
 
 
-        // Skills list
+        // ==============================
+        // 5. LOWERCASE TEXT
+        // ==============================
+
+        const resumeLower =
+            resumeText.toLowerCase();
+
+        const jobLower =
+            jobDescription.toLowerCase();
+
+
+        // ==============================
+        // 6. SKILLS
+        // ==============================
+
         const skills = [
 
             "javascript",
@@ -90,15 +154,23 @@ const analyzeResume = async (req, res) => {
         ];
 
 
-        // Find resume skills
-        const foundSkills = [];
+        // ==============================
+        // 7. FIND RESUME SKILLS
+        // ==============================
 
+        const foundSkills = [];
 
         skills.forEach((skill) => {
 
-            if (resumeLower.includes(skill.toLowerCase())) {
+            if (
+                resumeLower.includes(
+                    skill.toLowerCase()
+                )
+            ) {
 
-                if (!foundSkills.includes(skill)) {
+                if (
+                    !foundSkills.includes(skill)
+                ) {
 
                     foundSkills.push(skill);
 
@@ -109,15 +181,29 @@ const analyzeResume = async (req, res) => {
         });
 
 
-        // Find job skills
-        const jobSkills = [];
+        console.log(
+            "Resume Skills:",
+            foundSkills
+        );
 
+
+        // ==============================
+        // 8. FIND JOB SKILLS
+        // ==============================
+
+        const jobSkills = [];
 
         skills.forEach((skill) => {
 
-            if (jobLower.includes(skill.toLowerCase())) {
+            if (
+                jobLower.includes(
+                    skill.toLowerCase()
+                )
+            ) {
 
-                if (!jobSkills.includes(skill)) {
+                if (
+                    !jobSkills.includes(skill)
+                ) {
 
                     jobSkills.push(skill);
 
@@ -128,26 +214,58 @@ const analyzeResume = async (req, res) => {
         });
 
 
-        // Matching skills
-        const matchingSkills = jobSkills.filter(
-            (skill) => foundSkills.includes(skill)
+        console.log(
+            "Job Skills:",
+            jobSkills
         );
 
 
-        // Missing skills
-        const missingSkills = jobSkills.filter(
-            (skill) => !foundSkills.includes(skill)
+        // ==============================
+        // 9. MATCHING SKILLS
+        // ==============================
+
+        const matchingSkills =
+            jobSkills.filter(
+                (skill) =>
+                    foundSkills.includes(skill)
+            );
+
+
+        // ==============================
+        // 10. MISSING SKILLS
+        // ==============================
+
+        const missingSkills =
+            jobSkills.filter(
+                (skill) =>
+                    !foundSkills.includes(skill)
+            );
+
+
+        console.log(
+            "Matching Skills:",
+            matchingSkills
+        );
+
+        console.log(
+            "Missing Skills:",
+            missingSkills
         );
 
 
-        // Calculate score
+        // ==============================
+        // 11. CALCULATE SCORE
+        // ==============================
+
         let score = 0;
-
 
         if (jobSkills.length > 0) {
 
             score = Math.round(
-                (matchingSkills.length / jobSkills.length) * 100
+                (
+                    matchingSkills.length /
+                    jobSkills.length
+                ) * 100
             );
 
         } else {
@@ -157,11 +275,22 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        // Suggestions
+        console.log(
+            "Score:",
+            score
+        );
+
+
+        // ==============================
+        // 12. SUGGESTIONS
+        // ==============================
+
         const suggestions = [];
 
 
-        if (missingSkills.length > 0) {
+        if (
+            missingSkills.length > 0
+        ) {
 
             suggestions.push(
                 "Add relevant skills from the job description if you genuinely have those skills."
@@ -170,7 +299,9 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        if (resumeText.length < 1000) {
+        if (
+            resumeText.length < 1000
+        ) {
 
             suggestions.push(
                 "Consider adding more relevant projects, experience and achievements."
@@ -179,7 +310,11 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        if (!resumeLower.includes("experience")) {
+        if (
+            !resumeLower.includes(
+                "experience"
+            )
+        ) {
 
             suggestions.push(
                 "Consider adding an Experience section if you have relevant experience."
@@ -188,7 +323,11 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        if (!resumeLower.includes("project")) {
+        if (
+            !resumeLower.includes(
+                "project"
+            )
+        ) {
 
             suggestions.push(
                 "Consider adding relevant projects."
@@ -197,7 +336,11 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        if (!resumeLower.includes("education")) {
+        if (
+            !resumeLower.includes(
+                "education"
+            )
+        ) {
 
             suggestions.push(
                 "Consider adding an Education section."
@@ -206,7 +349,9 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        if (suggestions.length === 0) {
+        if (
+            suggestions.length === 0
+        ) {
 
             suggestions.push(
                 "Your resume contains the main keywords detected from the job description."
@@ -215,67 +360,116 @@ const analyzeResume = async (req, res) => {
         }
 
 
-        // Save result to MongoDB
-        const analysis = await ResumeAnalysis.create({
+        // ==============================
+        // 13. SAVE TO MONGODB
+        // ==============================
 
-            resumeName: req.file.originalname,
+        console.log(
+            "Saving result to MongoDB..."
+        );
 
-            jobDescription: jobDescription,
+        const analysis =
+            await ResumeAnalysis.create({
 
-            score: score,
+                resumeName:
+                    req.file.originalname,
 
-            matchingSkills: matchingSkills,
+                jobDescription:
+                    jobDescription,
 
-            missingSkills: missingSkills,
+                score:
+                    score,
 
-            resumeSkills: foundSkills,
+                matchingSkills:
+                    matchingSkills,
 
-            jobSkills: jobSkills,
+                missingSkills:
+                    missingSkills,
 
-            suggestions: suggestions,
+                resumeSkills:
+                    foundSkills,
 
-            resumeText: resumeText
+                jobSkills:
+                    jobSkills,
 
-        });
+                suggestions:
+                    suggestions,
+
+                resumeText:
+                    resumeText
+
+            });
 
 
-        // Delete uploaded PDF
-        fs.unlink(req.file.path, (error) => {
+        console.log(
+            "Saved successfully:",
+            analysis._id
+        );
 
-            if (error) {
-                console.log(
-                    "File deletion error:",
-                    error.message
-                );
+
+        // ==============================
+        // 14. DELETE PDF
+        // ==============================
+
+        fs.unlink(
+            req.file.path,
+            (error) => {
+
+                if (error) {
+
+                    console.log(
+                        "File deletion error:",
+                        error.message
+                    );
+
+                } else {
+
+                    console.log(
+                        "PDF deleted"
+                    );
+
+                }
+
             }
+        );
 
-        });
 
+        // ==============================
+        // 15. RESPONSE
+        // ==============================
 
-        // Response
-        res.status(200).json({
+        return res.status(200).json({
 
             success: true,
 
-            message: "Resume analyzed and saved successfully",
+            message:
+                "Resume analyzed and saved successfully",
 
             result: {
 
-                id: analysis._id,
+                id:
+                    analysis._id,
 
-                resumeName: analysis.resumeName,
+                resumeName:
+                    analysis.resumeName,
 
-                score: analysis.score,
+                score:
+                    analysis.score,
 
-                matchingSkills: analysis.matchingSkills,
+                matchingSkills:
+                    analysis.matchingSkills,
 
-                missingSkills: analysis.missingSkills,
+                missingSkills:
+                    analysis.missingSkills,
 
-                resumeSkills: analysis.resumeSkills,
+                resumeSkills:
+                    analysis.resumeSkills,
 
-                jobSkills: analysis.jobSkills,
+                jobSkills:
+                    analysis.jobSkills,
 
-                suggestions: analysis.suggestions
+                suggestions:
+                    analysis.suggestions
 
             }
 
@@ -284,15 +478,38 @@ const analyzeResume = async (req, res) => {
 
     } catch (error) {
 
-        console.log(error);
+        // ==============================
+        // ERROR
+        // ==============================
 
-        res.status(500).json({
+        console.log(
+            "========== RESUME ANALYSIS ERROR =========="
+        );
+
+        console.log(
+            "Error message:",
+            error.message
+        );
+
+        console.log(
+            "Full error:",
+            error
+        );
+
+        console.log(
+            "==========================================="
+        );
+
+
+        return res.status(500).json({
 
             success: false,
 
-            message: "Error analyzing resume",
+            message:
+                "Error analyzing resume",
 
-            error: error.message
+            error:
+                error.message
 
         });
 
